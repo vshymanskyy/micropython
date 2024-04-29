@@ -60,15 +60,8 @@
 
 typedef struct _mp_obj_hash_t {
     mp_obj_base_t base;
-    bool final; // if set, update and digest raise an exception
     uintptr_t state[0]; // must be aligned to a machine word
 } mp_obj_hash_t;
-
-static void hashlib_ensure_not_final(mp_obj_hash_t *self) {
-    if (self->final) {
-        mp_raise_ValueError(MP_ERROR_TEXT("hash is final"));
-    }
-}
 
 #if MICROPY_PY_HASHLIB_SHA256
 static mp_obj_t hashlib_sha256_update(mp_obj_t self_in, mp_obj_t arg);
@@ -84,7 +77,6 @@ static mp_obj_t hashlib_sha256_update(mp_obj_t self_in, mp_obj_t arg);
 static mp_obj_t hashlib_sha256_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
     mp_obj_hash_t *o = mp_obj_malloc_var(mp_obj_hash_t, state, char, sizeof(mbedtls_sha256_context), type);
-    o->final = false;
     mbedtls_sha256_init((mbedtls_sha256_context *)&o->state);
     mbedtls_sha256_starts_ret((mbedtls_sha256_context *)&o->state, 0);
     if (n_args == 1) {
@@ -95,7 +87,6 @@ static mp_obj_t hashlib_sha256_make_new(const mp_obj_type_t *type, size_t n_args
 
 static mp_obj_t hashlib_sha256_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
     mbedtls_sha256_update_ret((mbedtls_sha256_context *)&self->state, bufinfo.buf, bufinfo.len);
@@ -104,11 +95,12 @@ static mp_obj_t hashlib_sha256_update(mp_obj_t self_in, mp_obj_t arg) {
 
 static mp_obj_t hashlib_sha256_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
-    self->final = true;
     vstr_t vstr;
     vstr_init_len(&vstr, 32);
-    mbedtls_sha256_finish_ret((mbedtls_sha256_context *)&self->state, (unsigned char *)vstr.buf);
+    mbedtls_sha256_context ctx2;
+    mbedtls_sha256_init(&ctx2);
+    mbedtls_sha256_clone(&ctx2, (mbedtls_sha256_context *)&self->state);
+    mbedtls_sha256_finish_ret(&ctx2, (unsigned char *)vstr.buf);
     return mp_obj_new_bytes_from_vstr(&vstr);
 }
 
@@ -129,7 +121,6 @@ static mp_obj_t hashlib_sha256_make_new(const mp_obj_type_t *type, size_t n_args
 
 static mp_obj_t hashlib_sha256_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
     sha256_update((CRYAL_SHA256_CTX *)self->state, bufinfo.buf, bufinfo.len);
@@ -138,8 +129,6 @@ static mp_obj_t hashlib_sha256_update(mp_obj_t self_in, mp_obj_t arg) {
 
 static mp_obj_t hashlib_sha256_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
-    self->final = true;
     vstr_t vstr;
     vstr_init_len(&vstr, SHA256_BLOCK_SIZE);
     sha256_final((CRYAL_SHA256_CTX *)self->state, (byte *)vstr.buf);
@@ -183,7 +172,6 @@ static mp_obj_t hashlib_sha1_make_new(const mp_obj_type_t *type, size_t n_args, 
 
 static mp_obj_t hashlib_sha1_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
     SHA1_Update((SHA1_CTX *)self->state, bufinfo.buf, bufinfo.len);
@@ -192,8 +180,6 @@ static mp_obj_t hashlib_sha1_update(mp_obj_t self_in, mp_obj_t arg) {
 
 static mp_obj_t hashlib_sha1_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
-    self->final = true;
     vstr_t vstr;
     vstr_init_len(&vstr, SHA1_SIZE);
     SHA1_Final((byte *)vstr.buf, (SHA1_CTX *)self->state);
@@ -223,7 +209,6 @@ static mp_obj_t hashlib_sha1_make_new(const mp_obj_type_t *type, size_t n_args, 
 
 static mp_obj_t hashlib_sha1_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
     mbedtls_sha1_update_ret((mbedtls_sha1_context *)self->state, bufinfo.buf, bufinfo.len);
@@ -232,12 +217,12 @@ static mp_obj_t hashlib_sha1_update(mp_obj_t self_in, mp_obj_t arg) {
 
 static mp_obj_t hashlib_sha1_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
-    self->final = true;
     vstr_t vstr;
     vstr_init_len(&vstr, 20);
-    mbedtls_sha1_finish_ret((mbedtls_sha1_context *)self->state, (byte *)vstr.buf);
-    mbedtls_sha1_free((mbedtls_sha1_context *)self->state);
+    mbedtls_sha1_context ctx2;
+    mbedtls_sha1_init(&ctx2);
+    mbedtls_sha1_clone(&ctx2, (mbedtls_sha1_context *)&self->state);
+    mbedtls_sha1_finish_ret(&ctx2, (byte *)vstr.buf);
     return mp_obj_new_bytes_from_vstr(&vstr);
 }
 #endif
@@ -277,7 +262,6 @@ static mp_obj_t hashlib_md5_make_new(const mp_obj_type_t *type, size_t n_args, s
 
 static mp_obj_t hashlib_md5_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
     MD5_Update((MD5_CTX *)self->state, bufinfo.buf, bufinfo.len);
@@ -286,8 +270,6 @@ static mp_obj_t hashlib_md5_update(mp_obj_t self_in, mp_obj_t arg) {
 
 static mp_obj_t hashlib_md5_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
-    self->final = true;
     vstr_t vstr;
     vstr_init_len(&vstr, MD5_SIZE);
     MD5_Final((byte *)vstr.buf, (MD5_CTX *)self->state);
@@ -317,7 +299,6 @@ static mp_obj_t hashlib_md5_make_new(const mp_obj_type_t *type, size_t n_args, s
 
 static mp_obj_t hashlib_md5_update(mp_obj_t self_in, mp_obj_t arg) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(arg, &bufinfo, MP_BUFFER_READ);
     mbedtls_md5_update_ret((mbedtls_md5_context *)self->state, bufinfo.buf, bufinfo.len);
@@ -326,12 +307,12 @@ static mp_obj_t hashlib_md5_update(mp_obj_t self_in, mp_obj_t arg) {
 
 static mp_obj_t hashlib_md5_digest(mp_obj_t self_in) {
     mp_obj_hash_t *self = MP_OBJ_TO_PTR(self_in);
-    hashlib_ensure_not_final(self);
-    self->final = true;
     vstr_t vstr;
     vstr_init_len(&vstr, 16);
-    mbedtls_md5_finish_ret((mbedtls_md5_context *)self->state, (byte *)vstr.buf);
-    mbedtls_md5_free((mbedtls_md5_context *)self->state);
+    mbedtls_md5_context ctx2;
+    mbedtls_md5_init(&ctx2);
+    mbedtls_md5_clone(&ctx2, (mbedtls_md5_context *)&self->state);
+    mbedtls_md5_finish_ret(&ctx2, (byte *)vstr.buf);
     return mp_obj_new_bytes_from_vstr(&vstr);
 }
 #endif // MICROPY_SSL_MBEDTLS

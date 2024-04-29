@@ -32,6 +32,7 @@ endif()
 if(MICROPY_BOARD_VARIANT STREQUAL "SPIRAM")
     set(SDKCONFIG_DEFAULTS
         ${SDKCONFIG_DEFAULTS}
+        boards/ESP32_GENERIC/sdkconfig.ota
         boards/sdkconfig.spiram
     )
 

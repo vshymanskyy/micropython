@@ -34,7 +34,7 @@ BAUD ?= 460800
 
 PYTHON ?= python3
 
-.PHONY: all clean deploy erase submodules FORCE
+.PHONY: all clean menuconfig deploy erase submodules FORCE
 
 CMAKE_ARGS =
 
@@ -76,6 +76,9 @@ $(BUILD)/bootloader/bootloader.bin $(BUILD)/partition_table/partition-table.bin 
 
 clean:
 	$(call RUN_IDF_PY,fullclean)
+
+menuconfig:
+	$(call RUN_IDF_PY,menuconfig)
 
 deploy:
 	$(call RUN_IDF_PY,flash)

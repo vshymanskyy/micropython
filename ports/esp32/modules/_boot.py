@@ -6,8 +6,10 @@ try:
     if bdev:
         vfs.mount(bdev, "/")
 except OSError:
-    import inisetup
+    # This is handled later via FS recovery
+    pass
 
-    inisetup.setup()
+__import__("_preinit")
 
+del vfs, bdev
 gc.collect()
