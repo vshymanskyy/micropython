@@ -2,7 +2,8 @@ freeze("$(PORT_DIR)/modules")
 include("$(MPY_DIR)/extmod/asyncio")
 
 # Useful networking-related packages.
-require("bundle-networking")
+require("mip")
+require("requests")
 
 # Require some micropython-lib modules.
 require("logging")
