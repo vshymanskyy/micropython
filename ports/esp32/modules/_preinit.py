@@ -100,7 +100,7 @@ def install_pending():
         #log.debug("No packages to install")
         return
 
-    import tarfile, machine
+    import tarfile
 
     files = list(map(lambda x: "ota/" + x, files))
     installed = False
@@ -129,8 +129,6 @@ def install_pending():
 
     if installed:
         os.sync()
-        log.info("Rebooting...")
-        machine.reset()
 
 install_pending()
 
@@ -180,20 +178,36 @@ class PartitionReader(io.IOBase):
         elif whence == 2:
             self._pos = self._bc * self._bs + offset
 
-def install_recovery():
-    log.warning(".:[ Loading from recovery ]:.")
+from flashbdev import bdev
 
+def format_fs():
+    log.info("Formatting FS...")
+    try:
+        os.umount("/")
+    except:
+        pass
+    os.VfsLfs2.mkfs(bdev)
+    os.mount(bdev, "/")
+
+def install_recovery():
     from esp32 import Partition
     p = Partition.find(Partition.TYPE_DATA, label="recovery")
-    if not p:
-        raise RuntimeError("No recovery partition")
-    p = p[0]
+    if len(p):
+        log.warning(".:[ Recovery from partition ]:.")
+        f = PartitionReader(p[0])
+    else:
+        # No recovery partition, try importing .frozen recovery
+        try:
+            import _recovery
+            log.warning(".:[ Recovery from .frozen ]:.")
+            f = _recovery.data()
+        except:
+            format_fs()
+            log.info("No recovery image")
 
-    import tarfile, machine
-    from flashbdev import bdev
+    import tarfile
     from deflate import DeflateIO
 
-    f = PartitionReader(p)
     with DeflateIO(f) as gz:
         buf = memoryview(bytearray(280))
         gz.readinto(buf)
@@ -204,7 +218,7 @@ def install_recovery():
     elif buf[257:262] == b"ustar":
         imgtype = "tar"
     else:
-        raise RuntimeError("No recovery image")
+        raise RuntimeError("Recovery image not recognized")
 
     if imgtype == "lfs":
         log.info("Inflating FS...")
@@ -227,18 +241,12 @@ def install_recovery():
         #os.mount(bdev, "/")
         sys.stdout.write(b"\n")
     else:
-        log.info("Formatting FS...")
-        os.umount("/")
-        os.VfsLfs2.mkfs(bdev)
-        os.mount(bdev, "/")
+        format_fs()
         os.mkdir("/lib")  # TODO
         with DeflateIO(f) as gz:
             with tarfile.TarFile(fileobj=gz) as tar:
                 _process_tar(tar)
         os.sync()
-
-    log.info("Rebooting...")
-    machine.reset()
 
 if not os.listdir():
     install_recovery()
