@@ -12,9 +12,6 @@ sys.path = ["", "/lib", ".frozen"]
 ### LOG
 
 import time
-
-#print(time.ticks_ms(), "Set up logging")
-
 import logging
 
 _lvlfmt = {
@@ -183,16 +180,22 @@ class PartitionReader(io.IOBase):
         elif whence == 2:
             self._pos = self._bc * self._bs + offset
 
+import vfs
 from flashbdev import bdev
 
 def format_fs():
     log.info("Formatting FS...")
     try:
-        os.umount("/")
+        vfs.umount("/")
     except:
         pass
-    os.VfsLfs2.mkfs(bdev)
-    os.mount(bdev, "/")
+    if bdev.info()[4] == "vfs":
+        vfs.VfsLfs2.mkfs(bdev)
+        fs = vfs.VfsLfs2(bdev)
+    elif bdev.info()[4] == "ffat":
+        vfs.VfsFat.mkfs(bdev)
+        fs = vfs.VfsFat(bdev)
+    vfs.mount(fs, "/")
 
 def install_recovery():
     from esp32 import Partition
@@ -209,6 +212,11 @@ def install_recovery():
         except:
             format_fs()
             log.info("No recovery image")
+            with open("boot.py", "w") as out:
+                out.write("# This file is executed on every boot (including wake-boot from deepsleep)\n")
+            with open("main.py", "w") as out:
+                out.write("# Put your main code here\n")
+            return
 
     import tarfile
     from deflate import DeflateIO
@@ -228,7 +236,7 @@ def install_recovery():
     if imgtype == "lfs":
         log.info("Inflating FS...")
         try:
-            os.umount("/")
+            vfs.umount("/")
         except:
             pass
         with DeflateIO(f) as gz:
@@ -243,7 +251,7 @@ def install_recovery():
                 pos += 1
                 if ret < bs:
                     break
-        #os.mount(bdev, "/")
+        #vfs.mount(bdev, "/")
         sys.stdout.write(b"\n")
     else:
         format_fs()
@@ -253,7 +261,26 @@ def install_recovery():
                 _process_tar(tar)
         os.sync()
 
-if not os.listdir():
+def check_btn_press():
+    import machine
+    button = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP)
+    press_time = None
+    t = time.ticks_ms()
+    start_time = t
+    while time.ticks_diff(t, start_time) < 500:
+        pressed = (button.value() == 0)
+        if pressed:
+            if press_time is None:
+                press_time = t
+            if time.ticks_diff(t, press_time) > 100:
+                return True
+        else:
+            press_time = None
+        time.sleep_ms(10)
+        t = time.ticks_ms()
+    return False
+
+if not os.listdir() or check_btn_press():
     install_recovery()
 
 ### MAIN APP
