@@ -5,7 +5,7 @@ from flashbdev import bdev
 try:
     if bdev:
         vfs.mount(bdev, "/")
-except OSError:
+except:
     # This is handled later via FS recovery
     pass
 

@@ -32,6 +32,8 @@
 
 // Enable mbedtls modules
 #define MBEDTLS_GCM_C
+#define MBEDTLS_BASE64_C
+#define MBEDTLS_PEM_PARSE_C
 
 // Time hook
 #include <time.h>

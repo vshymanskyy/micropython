@@ -214,7 +214,12 @@ class PartitionReader(io.IOBase):
             self._pos = self._bc * self._bs + offset
 
 import vfs
-from flashbdev import bdev
+
+if sys.platform == "esp32":
+    from flashbdev import bdev
+elif sys.platform == "rp2":
+    import rp2
+    bdev = rp2.Flash()
 
 def format_fs():
     log.info("Formatting FS...")
@@ -222,21 +227,28 @@ def format_fs():
         vfs.umount("/")
     except:
         pass
-    if bdev.info()[4] == "vfs":
-        vfs.VfsLfs2.mkfs(bdev)
-        fs = vfs.VfsLfs2(bdev)
-    elif bdev.info()[4] == "ffat":
-        vfs.VfsFat.mkfs(bdev)
-        fs = vfs.VfsFat(bdev)
+    if sys.platform == "esp32":
+        if bdev.info()[4] == "vfs":
+            vfs.VfsLfs2.mkfs(bdev)
+            fs = vfs.VfsLfs2(bdev)
+        elif bdev.info()[4] == "ffat":
+            vfs.VfsFat.mkfs(bdev)
+            fs = vfs.VfsFat(bdev)
+    elif sys.platform == "rp2":
+        vfs.VfsLfs2.mkfs(bdev, progsize=256)
+        fs = vfs.VfsLfs2(bdev, progsize=256)
     vfs.mount(fs, "/")
 
 def install_recovery():
-    from esp32 import Partition
-    p = Partition.find(Partition.TYPE_DATA, label="recovery")
-    if len(p):
-        log.warning(".:[ Recovery from partition ]:.")
-        f = PartitionReader(p[0])
-    else:
+    f = None
+    if sys.platform == "esp32":
+        from esp32 import Partition
+        p = Partition.find(Partition.TYPE_DATA, label="recovery")
+        if len(p):
+            log.warning(".:[ Recovery from partition ]:.")
+            f = PartitionReader(p[0])
+
+    if not f:
         # No recovery partition, try importing .frozen recovery
         try:
             import _recovery
