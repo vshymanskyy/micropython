@@ -14,6 +14,12 @@ sys.path = ["", "/lib", ".frozen"]
 import time
 import logging
 
+try:
+    from sysconfig import sysconfig
+    _logcfg = sysconfig["log"]
+except:
+    _logcfg = {}
+
 _lvlfmt = {
     logging.CRITICAL: ("C", "\033[31m"),
     logging.ERROR:    ("E", "\033[91m"),
@@ -23,18 +29,35 @@ _lvlfmt = {
 }
 _lvlfmt.setdefault((" ", ""))
 
-class LogFormatter:
+_loglvl = {
+    "none":     1000,
+    "critical": logging.CRITICAL,
+    "error":    logging.ERROR,
+    "warning":  logging.WARNING,
+    "info":     logging.INFO,
+    "debug":    logging.DEBUG,
+}.get(_logcfg.get("level"), logging.INFO)
+
+class SimpleLogFormatter:
     def format(self, r):
-        lvl, fmt = _lvlfmt[r.levelno]
-        return f"{fmt}{time.ticks_ms():6d} {lvl} {r.name:12s} {r.message}\033[0m"
+        lvl, _ = _lvlfmt[r.levelno]
+        return f"{time.ticks_ms():6d} {lvl} {r.name:12s} {r.message}"
+
+class ColorLogFormatter:
+    def format(self, r):
+        lvl, color = _lvlfmt[r.levelno]
+        return f"{color}{time.ticks_ms():6d} {lvl} {r.name:12s} {r.message}\033[0m"
 
 lh = logging.StreamHandler()
-lh.setLevel(logging.DEBUG)
-lh.setFormatter(LogFormatter())
+lh.setLevel(_loglvl)
+if _logcfg.get("color"):
+    lh.setFormatter(ColorLogFormatter())
+else:
+    lh.setFormatter(SimpleLogFormatter())
 log = logging.getLogger()
 log.handlers.clear()
 log.addHandler(lh)
-log.setLevel(logging.DEBUG)
+log.setLevel(_loglvl)
 
 ### OTA
 
@@ -214,7 +237,12 @@ class PartitionReader(io.IOBase):
             self._pos = self._bc * self._bs + offset
 
 import vfs
-from flashbdev import bdev
+
+if sys.platform == "esp32":
+    from flashbdev import bdev
+elif sys.platform == "rp2":
+    import rp2
+    bdev = rp2.Flash()
 
 def format_fs():
     log.info("Formatting FS...")
@@ -222,21 +250,28 @@ def format_fs():
         vfs.umount("/")
     except:
         pass
-    if bdev.info()[4] == "vfs":
-        vfs.VfsLfs2.mkfs(bdev)
-        fs = vfs.VfsLfs2(bdev)
-    elif bdev.info()[4] == "ffat":
-        vfs.VfsFat.mkfs(bdev)
-        fs = vfs.VfsFat(bdev)
+    if sys.platform == "esp32":
+        if bdev.info()[4] == "vfs":
+            vfs.VfsLfs2.mkfs(bdev)
+            fs = vfs.VfsLfs2(bdev)
+        elif bdev.info()[4] == "ffat":
+            vfs.VfsFat.mkfs(bdev)
+            fs = vfs.VfsFat(bdev)
+    elif sys.platform == "rp2":
+        vfs.VfsLfs2.mkfs(bdev, progsize=256)
+        fs = vfs.VfsLfs2(bdev, progsize=256)
     vfs.mount(fs, "/")
 
 def install_recovery():
-    from esp32 import Partition
-    p = Partition.find(Partition.TYPE_DATA, label="recovery")
-    if len(p):
-        log.warning(".:[ Recovery from partition ]:.")
-        f = PartitionReader(p[0])
-    else:
+    f = None
+    if sys.platform == "esp32":
+        from esp32 import Partition
+        p = Partition.find(Partition.TYPE_DATA, label="recovery")
+        if len(p):
+            log.warning(".:[ Recovery from partition ]:.")
+            f = PartitionReader(p[0])
+
+    if not f:
         # No recovery partition, try importing .frozen recovery
         try:
             import _recovery
@@ -288,8 +323,9 @@ def install_recovery():
         sys.stdout.write(b"\n")
     else:
         format_fs()
-        os.mkdir("/lib")  # TODO
-        os.mkdir("/cfg")  # TODO
+        os.mkdir("/lib")   # TODO
+        os.mkdir("/cfg")   # TODO
+        os.mkdir("/cert")  # TODO
         with DeflateIO(f) as gz:
             with tarfile.TarFile(fileobj=gz) as tar:
                 _process_tar(tar)
