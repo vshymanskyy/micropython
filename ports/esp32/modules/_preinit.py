@@ -7,7 +7,7 @@
 ### SYS PATH
 
 import sys
-sys.path = ["", "/lib", ".frozen"]
+sys.path = ["/lib", "", ".frozen"]
 
 ### LOG
 
@@ -15,7 +15,7 @@ import time
 import logging
 
 try:
-    from sysconfig import sysconfig
+    from config import sysconfig
     _logcfg = sysconfig["log"]
 except:
     _logcfg = {}
