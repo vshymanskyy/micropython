@@ -7,7 +7,7 @@
 ### SYS PATH
 
 import sys
-sys.path = ["/lib", "", ".frozen"]
+sys.path = ["/lib", ".frozen", ""]
 
 ### LOG
 
