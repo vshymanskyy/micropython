@@ -75,6 +75,7 @@ list(APPEND MICROPY_SOURCE_PORT
     network_wlan.c
     mpnimbleport.c
     modsocket.c
+    modcamera.c
     modesp.c
     esp32_nvs.c
     esp32_partition.c

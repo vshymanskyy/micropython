@@ -35,10 +35,12 @@ if(MICROPY_BOARD_VARIANT STREQUAL "SPIRAM")
         ${SDKCONFIG_DEFAULTS}
         boards/ESP32_GENERIC/sdkconfig.ota
         boards/sdkconfig.spiram
+        boards/sdkconfig.esp32cam
     )
 
     list(APPEND MICROPY_DEF_BOARD
         MICROPY_HW_BOARD_NAME="Generic ESP32 module with SPIRAM"
+        MODULE_CAMERA_ENABLED=1
     )
 endif()
 
