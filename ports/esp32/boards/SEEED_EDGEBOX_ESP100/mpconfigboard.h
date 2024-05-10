@@ -9,3 +9,4 @@
 
 #define MICROPY_HW_I2C0_SCL                 (19)
 #define MICROPY_HW_I2C0_SDA                 (20)
+#define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT "Seeed-EdgeBox"

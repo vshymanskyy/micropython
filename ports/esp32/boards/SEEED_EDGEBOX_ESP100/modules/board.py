@@ -172,7 +172,8 @@ def sta():
 def ppp():
     if _board.ppp is None:
         try:
-            _board.ppp = network.PPP(modem().uart)
+            m = modem()
+            _board.ppp = network.PPP(1)
         except Exception as e:
             sys.print_exception(e)
     return _board.ppp

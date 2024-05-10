@@ -13,9 +13,9 @@
         "generic_s3.jpg"
     ],
     "mcu": "esp32s3",
-    "product": "ESP32-S3",
+    "product": "EdgeBox-ESP-100",
     "thumbnail": "",
-    "url": "https://www.espressif.com/en/products/modules",
+    "url": "https://www.seeedstudio.com/EdgeBox-ESP-100-p-5490.html",
     "vendor": "Seeed",
     "variants": {
     }
