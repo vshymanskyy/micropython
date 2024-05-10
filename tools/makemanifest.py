@@ -234,7 +234,7 @@ def main():
                 args.build_dir + "/genhdr/qstrdefs.preprocessed.h",
             ]
             + args.mpy_tool_flags.split()
-            + mpy_files
+            + list(set(mpy_files))  # unique files
         )
         if res != 0:
             print("error freezing mpy {}:".format(mpy_files))
