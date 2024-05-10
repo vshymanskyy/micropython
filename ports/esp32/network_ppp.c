@@ -43,9 +43,12 @@
 #include "lwip/dns.h"
 #include "netif/ppp/pppapi.h"
 
+#include "driver/uart.h"
+#include "driver/gpio.h"
+
 #if defined(CONFIG_ESP_NETIF_TCPIP_LWIP) && defined(CONFIG_LWIP_PPP_SUPPORT)
 
-#define PPP_CLOSE_TIMEOUT_MS (4000)
+#define PPP_CLOSE_TIMEOUT_MS (6000)
 
 typedef struct _ppp_if_obj_t {
     mp_obj_base_t base;
@@ -53,7 +56,7 @@ typedef struct _ppp_if_obj_t {
     bool connected;
     volatile bool clean_close;
     ppp_pcb *pcb;
-    mp_obj_t stream;
+    int uart_num;
     SemaphoreHandle_t inactiveWaitSem;
     volatile TaskHandle_t client_task_handle;
     struct netif pppif;
@@ -63,7 +66,23 @@ const mp_obj_type_t ppp_if_type;
 
 static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
     ppp_if_obj_t *self = ctx;
-    struct netif *pppif = ppp_netif(self->pcb);
+
+    if(!self) {
+        return;
+    }
+
+    if(err_code != PPPERR_NONE) {
+        self->connected = false;
+    }
+
+    if(!pcb) {
+        return;
+    }
+
+    struct netif *pppif = ppp_netif(pcb);
+    if(!pppif){
+        return;
+    }
 
     switch (err_code) {
         case PPPERR_NONE:
@@ -84,11 +103,10 @@ static void ppp_status_cb(ppp_pcb *pcb, int err_code, void *ctx) {
     }
 }
 
-static mp_obj_t ppp_make_new(mp_obj_t stream) {
-    mp_get_stream_raise(stream, MP_STREAM_OP_READ | MP_STREAM_OP_WRITE);
+static mp_obj_t ppp_make_new(mp_obj_t uart_num) {
 
     ppp_if_obj_t *self = mp_obj_malloc_with_finaliser(ppp_if_obj_t, &ppp_if_type);
-    self->stream = stream;
+    self->uart_num = mp_obj_get_int(uart_num);
     self->active = false;
     self->connected = false;
     self->clean_close = false;
@@ -100,8 +118,7 @@ MP_DEFINE_CONST_FUN_OBJ_1(esp_network_ppp_make_new_obj, ppp_make_new);
 
 static u32_t ppp_output_callback(ppp_pcb *pcb, u8_t *data, u32_t len, void *ctx) {
     ppp_if_obj_t *self = ctx;
-    int err;
-    return mp_stream_rw(self->stream, data, len, &err, MP_STREAM_RW_WRITE);
+    return uart_write_bytes(self->uart_num, (const char*)data, len);
 }
 
 static void pppos_client_task(void *self_in) {
@@ -110,8 +127,7 @@ static void pppos_client_task(void *self_in) {
 
     int len = 0;
     while (ulTaskNotifyTake(pdTRUE, len <= 0) == 0) {
-        int err;
-        len = mp_stream_rw(self->stream, buf, sizeof(buf), &err, 0);
+        len = uart_read_bytes(self->uart_num, buf, sizeof(buf), 10 / portTICK_PERIOD_MS);
         if (len > 0) {
             pppos_input_tcpip(self->pcb, (u8_t *)buf, len);
         }
@@ -145,7 +161,7 @@ static mp_obj_t ppp_active(size_t n_args, const mp_obj_t *args) {
 
             if (self->client_task_handle != NULL) { // is connecting or connected?
                 // Wait for PPPERR_USER, with timeout
-                pppapi_close(self->pcb, 0);
+                pppapi_close(self->pcb, 1);
                 uint32_t t0 = mp_hal_ticks_ms();
                 while (!self->clean_close && mp_hal_ticks_ms() - t0 < PPP_CLOSE_TIMEOUT_MS) {
                     mp_hal_delay_ms(10);
