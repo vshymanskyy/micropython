@@ -4,21 +4,37 @@
 # The software is provided "as is", without any warranties or guarantees (explicit or implied).
 # This includes no assurances about being fit for any specific purpose.
 
-### SYS PATH
+### INITIAL SETUP
 
 import sys
 sys.path = ["/lib", ".frozen", ""]
+
+try:
+    from config import sysconfig
+except:
+    sysconfig = {} # Just in case
+
+_logcfg = sysconfig.get("log")
+_wdtcfg = sysconfig.get("wdt")
+if not isinstance(_logcfg, dict):
+    _logcfg = {}
+if not isinstance(_wdtcfg, dict):
+    _wdtcfg = {}
+
+### WDT
+
+import machine
+
+# WDT is enabled by default
+if _wdtcfg.get("enabled", True) and not _wdtcfg.get("skip_on_boot"):
+    wdt = machine.WDT(timeout=8000)
+else:
+    wdt = None
 
 ### LOG
 
 import time
 import logging
-
-try:
-    from config import sysconfig
-    _logcfg = sysconfig["log"]
-except:
-    _logcfg = {}
 
 _lvlfmt = {
     logging.CRITICAL: ("C", "\033[31m"),
@@ -148,6 +164,9 @@ def _process_tar(tar):
             src = tar.extractfile(i)
             with open(i.name, "wb") as dst:
                 file_copy(src, dst)
+
+            if wdt:
+                wdt.feed()
 
 def install_pending():
     try:
@@ -319,6 +338,8 @@ def install_recovery():
                 pos += 1
                 if ret < bs:
                     break
+                if wdt:
+                    wdt.feed()
         #vfs.mount(bdev, "/")
         sys.stdout.write(b"\n")
     else:
@@ -331,8 +352,10 @@ def install_recovery():
                 _process_tar(tar)
         os.sync()
 
+    log.warning("Rebooting...")
+    machine.reset()
+
 def check_btn_press():
-    import machine
     button = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP)
     press_time = None
     t = time.ticks_ms()
