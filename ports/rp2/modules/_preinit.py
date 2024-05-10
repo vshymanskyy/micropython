@@ -24,12 +24,21 @@ if not isinstance(_wdtcfg, dict):
 ### WDT
 
 import machine
+import asyncio
 
 # WDT is enabled by default
-if _wdtcfg.get("enabled", True) and not _wdtcfg.get("skip_on_boot"):
+if _wdtcfg.get("enabled", True):
     wdt = machine.WDT(timeout=8000)
 else:
     wdt = None
+
+async def _wdt_feed_task():
+    while True:
+        wdt.feed()
+        await asyncio.sleep_ms(500)
+
+if wdt and _wdtcfg.get("autofeed", True):
+    asyncio.create_task(_wdt_feed_task())
 
 ### LOG
 
@@ -62,7 +71,8 @@ class SimpleLogFormatter:
 class ColorLogFormatter:
     def format(self, r):
         lvl, color = _lvlfmt[r.levelno]
-        return f"{color}{time.ticks_ms():6d} {lvl} {r.name:12s} {r.message}\033[0m"
+        clear = "\033[0m" if color else ""
+        return f"{color}{time.ticks_ms():6d} {lvl} {r.name:12s} {r.message}{clear}"
 
 lh = logging.StreamHandler()
 lh.setLevel(_loglvl)
