@@ -4,9 +4,5 @@ include("$(PORT_DIR)/boards/manifest.py")
 require("mip")
 require("requests")
 
-# Require some micropython-lib modules.
-require("logging")
-require("tarfile")
-
 # Bluetooth
 require("aioble")
