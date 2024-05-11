@@ -194,7 +194,7 @@ static MP_DEFINE_CONST_FUN_OBJ_KW(camera_init_obj, 1, camera_init);
 static mp_obj_t camera_deinit(){
     esp_err_t err = esp_camera_deinit();
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Camera deinit Failed");
+        //ESP_LOGE(TAG, "Camera deinit Failed");
         return mp_const_false;
     }
 
