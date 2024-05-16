@@ -1,7 +1,6 @@
 import gc
 import vfs
 from flashbdev import bdev
-from config import sysconfig
 
 try:
     if bdev:
@@ -14,3 +13,6 @@ __import__("_preinit")
 
 del vfs, bdev
 gc.collect()
+
+# Import sysconfig after vfs was mounted
+from config import sysconfig

@@ -1,6 +1,5 @@
 import gc
 import vfs, rp2
-from config import sysconfig
 
 bdev = rp2.Flash()
 try:
@@ -14,3 +13,6 @@ __import__("_preinit")
 
 del vfs, bdev, fs
 gc.collect()
+
+# Import sysconfig after vfs was mounted
+from config import sysconfig
