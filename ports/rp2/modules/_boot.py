@@ -1,5 +1,6 @@
 import gc
 import vfs, rp2
+from config import sysconfig
 
 bdev = rp2.Flash()
 try:

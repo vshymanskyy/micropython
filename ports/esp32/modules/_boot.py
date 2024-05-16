@@ -1,6 +1,7 @@
 import gc
 import vfs
 from flashbdev import bdev
+from config import sysconfig
 
 try:
     if bdev:
