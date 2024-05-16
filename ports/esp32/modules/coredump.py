@@ -19,33 +19,56 @@ SUBTYPE_COREDUMP = 0x03
 dev = Partition.find(type=Partition.TYPE_DATA, subtype=SUBTYPE_COREDUMP)
 dev = dev[0] if dev else None
 
-class Base64Encoder:
-    def __init__(self):
-        self._d = bytearray()
+class Splitter:
+    def __init__(self, stream, width=120):
+        self._s = stream
+        self._w = width
+        self._b = bytearray(self._w)
+        self._p = 0
 
-    def encode(self, data):
+    def write(self, data):
+        data_len = len(data)
+        data_pos = 0
+
+        while data_pos < data_len:
+            # Calculate how much data to copy into the buffer
+            l = min(data_len - data_pos, self._w - self._p)
+            self._b[self._p:self._p + l] = data[data_pos:data_pos + l]
+            self._p += l
+            data_pos += l
+            # If buffer is full, write it
+            if self._p == self._w:
+                self._s.write(self._b[:self._p])
+                self._s.write(b"\n")
+                self._p = 0
+
+    def flush(self):
+        if self._p > 0:
+            self._s.write(self._b[:self._p])
+            self._p = 0
+        self._s.flush()
+
+class Base64Encoder:
+    def __init__(self, stream):
+        self._d = bytearray()
+        self._s = stream
+
+    def write(self, data):
         # Append new data to the buffer
         self._d.extend(data)
 
         # Calculate how many bytes can be encoded in this chunk (multiples of 3)
         l = len(self._d) // 3 * 3
-        chunk = self._d[:l]
+        if l:
+            chunk = self._d[:l]
+            self._d = self._d[l:]
+            self._s.write(binascii.b2a_base64(chunk, newline=0))
 
-        # Store remaining bytes
-        self._d = self._d[l:]
-
-        return binascii.b2a_base64(chunk, newline=False)
-
-    def finalize(self):
+    def flush(self):
         if len(self._d):
-            return binascii.b2a_base64(self._d, newline=False)
-        return b""
-
-class BinaryEncoder:
-    def encode(self, data):
-        return data
-    def finalize(self):
-        return b""
+            self._s.write(binascii.b2a_base64(self._d, newline=0))
+            self._d = bytearray()
+        self._s.flush()
 
 def available():
     if not dev:
@@ -75,9 +98,9 @@ def dump(stream=None, encoding=None):
         return
 
     if not encoding or encoding == "b64":
-        enc = Base64Encoder()
+        stream = Base64Encoder(Splitter(stream))
     elif encoding == "raw":
-        enc = BinaryEncoder()
+        pass
     else:
         raise ValueError("encoding")
 
@@ -88,8 +111,7 @@ def dump(stream=None, encoding=None):
         if (rem < len(buf)):
              buf = bytearray(rem)
         dev.readblocks(pos, buf)
-        stream.write(enc.encode(buf))
-        #stream.write(b"\n")
+        stream.write(buf)
         pos += 1
         rem -= len(buf)
-    stream.write(enc.finalize())
+    stream.flush()

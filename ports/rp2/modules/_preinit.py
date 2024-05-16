@@ -30,6 +30,7 @@ import asyncio
 if _wdtcfg.get("enabled", True):
     wdt = machine.WDT(timeout=8000)
 else:
+    print("Watchdog is disabled")
     wdt = None
 
 async def _wdt_feed_task():
@@ -158,8 +159,6 @@ def _process_tar(tar):
                 continue
 
             log.info("Writing %s [%d bytes]...", i.name, i.size)
-            # TODO: check that first file is a tag
-            # TODO: verify fw-type
 
             # Remove old files (MicroPython prefers loading .py over .mpy)
             rmfn = None
@@ -180,16 +179,15 @@ def _process_tar(tar):
 
 def install_pending():
     try:
-        files = os.listdir("ota")
+        files = os.listdir("tmp")
+        files = [ f"tmp/{x}" for x in files if x.startswith("ota.") ]
         if not len(files):
-            raise RuntimeError()
+            return
     except:
-        #log.debug("No packages to install")
         return
 
     import tarfile
 
-    files = list(map(lambda x: "ota/" + x, files))
     installed = False
     for fn in files:
         try:
@@ -224,46 +222,44 @@ install_pending()
 import io
 
 class PartitionReader(io.IOBase):
-    def __init__(self, p):
+    def __init__(self, part):
         super().__init__()
-        self._p = p
-        self._pos = 0
-        #self._bc = p.ioctl(4, 0)       # block count
-        self._bs = p.ioctl(5, 0)        # block size
-        self._cs = 0                    # cache start
+        self._part = part
+        self._p = 0
+        self._bc = part.ioctl(4, 0)  # block count
+        self._bs = part.ioctl(5, 0)  # block size
+        self._cs = 0                 # cache start
         self._cd = memoryview(bytearray(self._bs))
-        p.readblocks(0, self._cd)
+        part.readblocks(0, self._cd)
 
     def readinto(self, buf):
         ret = len(buf)
+        pos = self._p
         # Read from cache
-        if self._pos >= self._cs and self._pos + ret <= self._cs + len(self._cd):
-            cpos = self._pos - self._cs
+        if pos >= self._cs and pos + ret <= self._cs + len(self._cd):
+            cpos = pos - self._cs
             buf[:] = self._cd[cpos:cpos+ret]
-            self._pos += ret
+            self._p += ret
             return ret
         # Update cache
-        block, off = divmod(self._pos, self._bs)
+        block, off = divmod(pos, self._bs)
         self._cs = block * self._bs
-        self._p.readblocks(block, self._cd)
-        if self._pos >= self._cs and self._pos + ret <= self._cs + len(self._cd):
-            cpos = self._pos - self._cs
+        self._part.readblocks(block, self._cd)
+        if pos >= self._cs and pos + ret <= self._cs + len(self._cd):
+            cpos = pos - self._cs
             buf[:] = self._cd[cpos:cpos+ret]
         else:
-            self._p.readblocks(block, buf, off)
-        self._pos += ret
+            self._part.readblocks(block, buf, off)
+        self._p += ret
         return ret
 
-    def seekable(self):
-        return True
-
     def seek(self, offset, whence=0):
-        if whence == 0:
-            self._pos = offset
-        elif whence == 1:
-            self._pos += offset
-        elif whence == 2:
-            self._pos = self._bc * self._bs + offset
+        if whence == 0:     # SEEK_SET
+            self._p = offset
+        elif whence == 1:   # SEEK_CUR
+            self._p += offset
+        elif whence == 2:   # SEEK_END
+            self._p = self._bc * self._bs + offset
 
 import vfs
 
@@ -354,9 +350,11 @@ def install_recovery():
         sys.stdout.write(b"\n")
     else:
         format_fs()
-        os.mkdir("/lib")   # TODO
-        os.mkdir("/cfg")   # TODO
-        os.mkdir("/cert")  # TODO
+        # TODO
+        os.mkdir("/cert")
+        os.mkdir("/cfg")
+        os.mkdir("/lib")
+        os.mkdir("/tmp")
         with DeflateIO(f) as gz:
             with tarfile.TarFile(fileobj=gz) as tar:
                 _process_tar(tar)
