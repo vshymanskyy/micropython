@@ -215,6 +215,9 @@ def install_pending():
     if installed:
         os.sync()
 
+    log.warning("Soft reset...")
+    machine.soft_reset()
+
 install_pending()
 
 ### RECOVERY
@@ -360,8 +363,8 @@ def install_recovery():
                 _process_tar(tar)
         os.sync()
 
-    log.warning("Rebooting...")
-    machine.reset()
+    log.warning("Soft reset...")
+    machine.soft_reset()
 
 def check_btn_press():
     button = machine.Pin(0, machine.Pin.IN, machine.Pin.PULL_UP)
