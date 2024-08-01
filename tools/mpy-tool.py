@@ -27,8 +27,16 @@
 # Python 2/3 compatibility code
 from __future__ import print_function
 import platform
+import sys
 
-if platform.python_version_tuple()[0] == "2":
+if sys.implementation.name == 'micropython':
+    py_ver = "mpy"
+elif platform.python_version_tuple()[0] == "2":
+    py_ver = "2"
+elif platform.python_version_tuple()[0] == "3":
+    py_ver = "3"
+
+if py_ver == "2":
     from binascii import hexlify as hexlify_py2
 
     str_cons = lambda val, enc=None: str(val)
@@ -41,7 +49,7 @@ if platform.python_version_tuple()[0] == "2":
         x = hexlify_py2(b)
         return ":".join(x[i : i + 2] for i in range(0, len(x), 2))
 
-else:
+elif py_ver in ("3", "mpy"):
     from binascii import hexlify
 
     str_cons = str
@@ -113,6 +121,7 @@ MP_NATIVE_ARCH_ARMV7EMSP = 7
 MP_NATIVE_ARCH_ARMV7EMDP = 8
 MP_NATIVE_ARCH_XTENSA = 9
 MP_NATIVE_ARCH_XTENSAWIN = 10
+MP_NATIVE_ARCH_RV32IMC = 11
 
 MP_PERSISTENT_OBJ_FUN_TABLE = 0
 MP_PERSISTENT_OBJ_NONE = 1
@@ -734,8 +743,8 @@ class CompiledModule:
             elif config.MICROPY_LONGINT_IMPL == config.MICROPY_LONGINT_IMPL_NONE:
                 raise FreezeError(self, "target does not support long int")
             elif config.MICROPY_LONGINT_IMPL == config.MICROPY_LONGINT_IMPL_LONGLONG:
-                # TODO
-                raise FreezeError(self, "freezing int to long-long is not implemented")
+                print("static const mp_obj_int_t %s = {{&mp_type_int}, %d};" % (obj_name, obj))
+                return "MP_ROM_PTR(&%s)" % obj_name
             elif config.MICROPY_LONGINT_IMPL == config.MICROPY_LONGINT_IMPL_MPZ:
                 neg = 0
                 if obj < 0:
@@ -1094,8 +1103,10 @@ class RawCodeNative(RawCode):
         ):
             # ARMV6 or Xtensa -- four byte align.
             self.fun_data_attributes += " __attribute__ ((aligned (4)))"
-        elif MP_NATIVE_ARCH_ARMV6M <= config.native_arch <= MP_NATIVE_ARCH_ARMV7EMDP:
-            # ARMVxxM -- two byte align.
+        elif (
+            MP_NATIVE_ARCH_ARMV6M <= config.native_arch <= MP_NATIVE_ARCH_ARMV7EMDP
+        ) or config.native_arch == MP_NATIVE_ARCH_RV32IMC:
+            # ARMVxxM or RV32IMC -- two byte align.
             self.fun_data_attributes += " __attribute__ ((aligned (2)))"
 
     def disassemble(self):
