@@ -5,4 +5,5 @@ set(SDKCONFIG_DEFAULTS
     ${SDKCONFIG_IDF_VERSION_SPECIFIC}
     boards/sdkconfig.ble
     boards/ESP32_GENERIC_C3/sdkconfig.c3usb
+    boards/ESP32_GENERIC_C3/sdkconfig.ota
 )
