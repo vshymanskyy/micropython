@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 Linaro Limited
+ * Copyright (c) 2024 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,9 +23,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include "mpconfigport.h"
 
-#ifdef TEST
-#include "shared/upytesthelper/upytesthelper.h"
-#define MP_PLAT_PRINT_STRN(str, len) upytest_output(str, len)
-#endif
+    .global gc_helper_get_regs_and_sp
+    .type   gc_helper_get_regs_and_sp, @function
+
+gc_helper_get_regs_and_sp:
+
+    /* Store registers into the given array. */
+
+    sw    x8,  0(x10)  /* Save S0.  */
+    sw    x9,  8(x10)  /* Save S1.  */
+    sw   x18, 16(x10)  /* Save S2.  */
+    sw   x19, 24(x10)  /* Save S3.  */
+    sw   x20, 32(x10)  /* Save S4.  */
+    sw   x21, 40(x10)  /* Save S5.  */
+    sw   x22, 48(x10)  /* Save S6.  */
+    sw   x23, 56(x10)  /* Save S7.  */
+    sw   x24, 64(x10)  /* Save S8.  */
+    sw   x25, 72(x10)  /* Save S9.  */
+    sw   x26, 80(x10)  /* Save S10. */
+    sw   x27, 88(x10)  /* Save S11. */
+
+    /* Return the stack pointer. */
+
+    add  x10, x0, x2
+    jalr  x0, x1, 0
+
+    .size gc_helper_get_regs_and_sp, .-gc_helper_get_regs_and_sp

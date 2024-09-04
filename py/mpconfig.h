@@ -690,6 +690,13 @@
 #define MICROPY_STACK_CHECK (MICROPY_CONFIG_ROM_LEVEL_AT_LEAST_EXTRA_FEATURES)
 #endif
 
+// Additional margin between the places in the runtime where Python stack is
+// checked and the actual end of the C stack. Needs to be large enough to avoid
+// overflows from function calls made between checks.
+#ifndef MICROPY_STACK_CHECK_MARGIN
+#define MICROPY_STACK_CHECK_MARGIN (0)
+#endif
+
 // Whether to have an emergency exception buffer
 #ifndef MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF
 #define MICROPY_ENABLE_EMERGENCY_EXCEPTION_BUF (0)
@@ -1391,6 +1398,11 @@ typedef double mp_float_t;
 // Whether to provide fix for pow(1, NaN) and pow(NaN, 0), which both should be 1 not NaN.
 #ifndef MICROPY_PY_MATH_POW_FIX_NAN
 #define MICROPY_PY_MATH_POW_FIX_NAN (0)
+#endif
+
+// Whether to provide fix for gamma(-inf) to raise ValueError
+#ifndef MICROPY_PY_MATH_GAMMA_FIX_NEGINF
+#define MICROPY_PY_MATH_GAMMA_FIX_NEGINF (0)
 #endif
 
 // Whether to provide "cmath" module
