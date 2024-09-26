@@ -12,6 +12,7 @@ require("upysh")
 
 # Useful networking-related packages.
 require("mip")
+require("ssl")
 require("requests")
 require("aioble")
 require("aioespnow")
