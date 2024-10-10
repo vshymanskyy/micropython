@@ -109,6 +109,7 @@ list(APPEND MICROPY_SOURCE_PORT
     mpnimbleport.c
     modsocket.c
     modcamera.c
+    lwip_patch.c
     modesp.c
     esp32_nvs.c
     esp32_partition.c
