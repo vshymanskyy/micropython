@@ -26,17 +26,9 @@
 
 # Python 2/3 compatibility code
 from __future__ import print_function
-import platform
 import sys
 
-if sys.implementation.name == 'micropython':
-    py_ver = "mpy"
-elif platform.python_version_tuple()[0] == "2":
-    py_ver = "2"
-elif platform.python_version_tuple()[0] == "3":
-    py_ver = "3"
-
-if py_ver == "2":
+if sys.version_info[0] == 2:
     from binascii import hexlify as hexlify_py2
 
     str_cons = lambda val, enc=None: str(val)
@@ -49,7 +41,7 @@ if py_ver == "2":
         x = hexlify_py2(b)
         return ":".join(x[i : i + 2] for i in range(0, len(x), 2))
 
-elif py_ver in ("3", "mpy"):
+elif sys.version_info[0] == 3:  # Also handles MicroPython
     from binascii import hexlify
 
     str_cons = str
@@ -1773,7 +1765,7 @@ def merge_mpy(compiled_modules, output_file):
             f.write(merged_mpy)
 
 
-def main():
+def main(args=None):
     global global_qstrs
 
     import argparse
@@ -1805,7 +1797,7 @@ def main():
     )
     cmd_parser.add_argument("-o", "--output", default=None, help="output file")
     cmd_parser.add_argument("files", nargs="+", help="input .mpy files")
-    args = cmd_parser.parse_args()
+    args = cmd_parser.parse_args(args)
 
     # set config values relevant to target machine
     config.MICROPY_LONGINT_IMPL = {
