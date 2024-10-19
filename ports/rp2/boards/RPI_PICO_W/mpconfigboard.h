@@ -7,6 +7,7 @@
 // Enable networking.
 #define MICROPY_PY_NETWORK 1
 #define MICROPY_PY_NETWORK_HOSTNAME_DEFAULT     "PicoW"
+#define MICROPY_PY_NETWORK_PPP_LWIP 1
 
 // CYW43 driver configuration.
 #define CYW43_USE_SPI (1)
